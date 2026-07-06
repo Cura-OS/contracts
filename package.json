@@ -3,7 +3,8 @@
   "description": "CuraOS bulk-import contracts. The import-job mold (directory/archive/file modes, failed-row quarantine with reason, seen/merged/needs-review counts, person-facing status projection) plus a CSV adapter (row->record mapping, duplicate prevention, extract columns). Port-adapted from WorldVistA health-data-standards BulkRecordImporter (Apache-2.0, fresh TypeScript, no source copied).",
   "version": "0.1.0",
   "devDependencies": {
-    "@curaos/tsconfig": "0.0.0",
+    "oxlint": "1.68.0",
+    "@curaos/tsconfig": "workspace:*",
     "@types/bun": "1.3.14",
     "@types/node": "22.19.19",
     "typescript": "5.9.3"
