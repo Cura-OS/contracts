@@ -20,10 +20,10 @@
   "files": [
     "dist"
   ],
-  "license": "UNLICENSED",
+  "license": "LicenseRef-CuraOS-Proprietary",
   "main": "./dist/index.js",
   "packageManager": "bun@1.3.14",
-  "private": false,
+  "private": true,
   "publishConfig": {
     "access": "restricted",
     "registry": "http://localhost:4873"
