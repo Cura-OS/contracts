@@ -1,17 +1,113 @@
-# @curaos/contracts
+<div align="center">
 
-Bulk-import contracts for CuraOS. THE mold every bulk-import gap regenerates from.
 
-- `specs/import-job.tsp` - typed contract: `ImportJob`, `ImportMode` (importDirectory / archive / file), `FailedRow`, `ImportCounts` (seen / created / merged / needsReview), `MyRecordsImportStatus`.
-- `src/types.ts` - runtime mirror of the spec + `toMyRecordsStatus(job)` person projection.
-- `src/csv-adapter.ts` - CSV adapter ON the mold: `importCsv(config, sources)` (row->record mapping, duplicate prevention by `dedupKey`, failed-row quarantine with reason, counts) and `extractColumns(records, columns)` (admin extract + person "export my data").
+# contracts
 
-CSV is an ADAPTER on the `ImportJob` contract, not a new contract. Future formats (XLSX, JSON) are additional adapters on the same mold.
+**Provide shared bulk import contracts for archive, directory, file, and CSV ingestion flows.**
 
-The admin migration console and the person's "import status of my records" view read the SAME `ImportJob`; `toMyRecordsStatus` is the only narrowing (no raw payloads or source paths leak to the person).
+Part of the CuraOS (Care Oriented Stack) platform. Provide shared bulk import contracts for archive, directory, file, and CSV ingestion flows. Domain: neutral.
 
-## License attribution
+[![Status](https://img.shields.io/badge/status-private--alpha-informational)](#status)
+[![License: Proprietary](https://img.shields.io/badge/license-Proprietary-red)](./LICENSE)
+[![Exposure: Closed](https://img.shields.io/badge/exposure-Closed-red)](#license)
+[![Module: Package](https://img.shields.io/badge/module-Package-informational)](#how-it-works)
 
-The import-job model (directory/archive/file mode split, failed-row quarantine-with-reason, seen/merged/needs-review counts, dedup-by-identifier merge) is port-adapted from [WorldVistA health-data-standards](https://github.com/projectcypress/health-data-standards) `BulkRecordImporter` - Copyright (c) The MITRE Corporation / WorldVistA, licensed Apache-2.0. Fresh TypeScript expressing the model; no source copied. The bahmni idempotent-upsert dup-prevention pattern informed the design as reference only; no source lifted.
+[Why](#why) · [Quick Start](#quick-start) · [Capabilities](#capabilities) · [How it Works](#how-it-works) · [Status](#status) · [Security](#security)
 
-Test: `bun test`. Typecheck: `tsc --noEmit`.
+</div>
+
+---
+
+## Why
+
+Provide shared bulk import contracts for archive, directory, file, and CSV ingestion flows.
+
+<!-- curaos:keep -->
+<!-- /curaos:keep -->
+
+---
+
+## Quick Start
+
+```bash
+bun add @curaos/contracts
+```
+
+<!-- curaos:keep -->
+<!-- /curaos:keep -->
+
+---
+
+## Capabilities
+
+- Typecheck passes.
+- Import counters have unit coverage.
+- New adapters document duplicate and quarantine behavior.
+
+<!-- curaos:keep -->
+<!-- /curaos:keep -->
+
+---
+
+## How it Works
+
+| Area | Detail |
+|---|---|
+| Package | `@curaos/contracts` |
+| Source | `backend/packages/contracts` |
+| Domain | `neutral` |
+| Layer | `package` |
+| Exposure | Closed |
+
+- Source path: `backend/packages/contracts`
+- Generated documentation owner: `tools/codegen/src/repo-docs-emit.ts`
+
+<!-- curaos:keep -->
+<!-- /curaos:keep -->
+
+---
+
+## API and Usage
+
+See [docs.curaos.abualruz.com](https://docs.curaos.abualruz.com) (interim).
+
+See [API reference](./src/index.ts) or generated TypeDoc.
+
+<!-- curaos:keep -->
+<!-- /curaos:keep -->
+
+---
+
+## Status
+
+private alpha
+
+- Docs generated from `tools/codegen/src/repo-docs-emit.ts`.
+- Public documentation: [docs.curaos.abualruz.com](https://docs.curaos.abualruz.com).
+- Changelog: [CHANGELOG.md](./CHANGELOG.md) when present.
+
+---
+
+## Security
+
+See [SECURITY.md](./SECURITY.md) for vulnerability reporting policy.
+
+---
+
+## Maintainers
+
+- CuraOS Team - [GitHub](https://github.com/Cura-OS)
+
+---
+
+## Contributing
+
+Contributions are handled through the repository maintainers. Public contribution guidelines are emitted for open and source-available repositories.
+
+By contributing, you agree that your contributions will be licensed under the same license as this project.
+
+---
+
+## License
+
+LicenseRef-CuraOS-Proprietary - CuraOS (Care Oriented Stack). See [LICENSE](./LICENSE) for details.
