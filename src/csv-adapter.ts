@@ -69,9 +69,48 @@ export function splitCsvLine(line: string): string[] {
   return cells;
 }
 
-/** Split CSV text into non-empty lines (tolerates \r\n and a trailing newline). */
-function toLines(text: string): string[] {
-  return text.split(/\r?\n/).filter((l) => l.length > 0);
+/**
+ * Split CSV text into non-empty logical lines. QUOTE-AWARE: a newline inside an
+ * open quoted field does NOT end the line, so a quoted multiline cell (which
+ * extractColumns/exportCsv legitimately emit) round-trips instead of being torn
+ * across physical lines. Tolerates \r\n and a trailing newline. Mirrors
+ * splitCsvLine's quote handling (a "" pair inside quotes is a literal quote, not
+ * a field terminator) so the two stay consistent.
+ *
+ * FAIL-CLOSED: if a quoted field is never closed (inQuotes still true at EOF),
+ * every physical row from the opening quote to EOF has been swallowed into the
+ * final logical line. Report `unterminated` so importCsv can quarantine that
+ * blob instead of silently merging the lost rows into one record.
+ */
+function toLines(text: string): { lines: string[]; unterminated: boolean } {
+  const lines: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        // escaped quote inside a quoted field: keep both, stay in-quotes
+        cur += '""';
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      cur += c;
+    } else if (c === '\n' && !inQuotes) {
+      lines.push(cur);
+      cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  lines.push(cur);
+  return {
+    lines: lines
+      .map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l))
+      .filter((l) => l.length > 0),
+    unterminated: inQuotes,
+  };
 }
 
 /**
@@ -96,9 +135,21 @@ export function importCsv(
   let merged = 0;
 
   for (const src of sources) {
-    const lines = toLines(src.text);
+    const { lines, unterminated } = toLines(src.text);
     const header = lines[0];
     if (header === undefined) continue;
+    // FAIL-CLOSED: unterminated quote swallowed everything into the header line;
+    // there is no valid row to trust. Quarantine the whole blob, skip the source.
+    if (unterminated && lines.length === 1) {
+      seen++;
+      failedRows.push({
+        rowIndex: 0,
+        source: src.source,
+        reason: 'unterminated quoted field (rows from the open quote to EOF)',
+        raw: header,
+      });
+      continue;
+    }
     const headers = splitCsvLine(header).map((h) => h.trim());
 
     for (let i = 1; i < lines.length; i++) {
@@ -108,6 +159,14 @@ export function importCsv(
       const cells = splitCsvLine(raw);
       const quarantine = (reason: string) =>
         failedRows.push({ rowIndex, source: src.source, reason, raw });
+
+      // FAIL-CLOSED: an unterminated quoted field swallowed every row from its
+      // opening quote to EOF into this final logical line. Quarantine the blob
+      // rather than merge the lost tail rows into one silent record.
+      if (unterminated && i === lines.length - 1) {
+        quarantine('unterminated quoted field (rows from the open quote to EOF)');
+        continue;
+      }
 
       if (cells.length !== headers.length) {
         quarantine(
