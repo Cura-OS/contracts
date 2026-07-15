@@ -76,8 +76,13 @@ export function splitCsvLine(line: string): string[] {
  * across physical lines. Tolerates \r\n and a trailing newline. Mirrors
  * splitCsvLine's quote handling (a "" pair inside quotes is a literal quote, not
  * a field terminator) so the two stay consistent.
+ *
+ * FAIL-CLOSED: if a quoted field is never closed (inQuotes still true at EOF),
+ * every physical row from the opening quote to EOF has been swallowed into the
+ * final logical line. Report `unterminated` so importCsv can quarantine that
+ * blob instead of silently merging the lost rows into one record.
  */
-function toLines(text: string): string[] {
+function toLines(text: string): { lines: string[]; unterminated: boolean } {
   const lines: string[] = [];
   let cur = '';
   let inQuotes = false;
@@ -100,9 +105,12 @@ function toLines(text: string): string[] {
     }
   }
   lines.push(cur);
-  return lines
-    .map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l))
-    .filter((l) => l.length > 0);
+  return {
+    lines: lines
+      .map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l))
+      .filter((l) => l.length > 0),
+    unterminated: inQuotes,
+  };
 }
 
 /**
@@ -127,9 +135,21 @@ export function importCsv(
   let merged = 0;
 
   for (const src of sources) {
-    const lines = toLines(src.text);
+    const { lines, unterminated } = toLines(src.text);
     const header = lines[0];
     if (header === undefined) continue;
+    // FAIL-CLOSED: unterminated quote swallowed everything into the header line;
+    // there is no valid row to trust. Quarantine the whole blob, skip the source.
+    if (unterminated && lines.length === 1) {
+      seen++;
+      failedRows.push({
+        rowIndex: 0,
+        source: src.source,
+        reason: 'unterminated quoted field (rows from the open quote to EOF)',
+        raw: header,
+      });
+      continue;
+    }
     const headers = splitCsvLine(header).map((h) => h.trim());
 
     for (let i = 1; i < lines.length; i++) {
@@ -139,6 +159,14 @@ export function importCsv(
       const cells = splitCsvLine(raw);
       const quarantine = (reason: string) =>
         failedRows.push({ rowIndex, source: src.source, reason, raw });
+
+      // FAIL-CLOSED: an unterminated quoted field swallowed every row from its
+      // opening quote to EOF into this final logical line. Quarantine the blob
+      // rather than merge the lost tail rows into one silent record.
+      if (unterminated && i === lines.length - 1) {
+        quarantine('unterminated quoted field (rows from the open quote to EOF)');
+        continue;
+      }
 
       if (cells.length !== headers.length) {
         quarantine(

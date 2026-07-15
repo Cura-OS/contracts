@@ -124,6 +124,40 @@ describe('quote-aware line splitting - export/import round-trip', () => {
   });
 });
 
+describe('unterminated quoted field - fail-closed, no silent row loss', () => {
+  test('unterminated quote quarantines the swallowed tail instead of merging rows', () => {
+    // A malformed upload opens a quote on row 1 and never closes it, so rows 2+3
+    // get swallowed into one field. Round-1 quote-aware toLines merged them
+    // silently (seen=1, needsReview=0, rows 2/3 lost). Must fail closed.
+    const src: CsvSource = {
+      source: 'malformed.csv',
+      text: 'id,note\n1,"oops\n2,good\n3,good',
+    };
+    const { job, records } = importCsv(cfg({ dedupKey: 'id' }), [src]);
+    expect(job.counts.created).toBe(0);
+    expect(records.size).toBe(0);
+    expect(job.counts.needsReview).toBe(1);
+    expect(job.failedRows[0].reason).toContain('unterminated quoted field');
+    expect(job.failedRows[0].source).toBe('malformed.csv');
+  });
+
+  test('unterminated quote on the header line is quarantined, not silently empty', () => {
+    const src: CsvSource = { source: 'bad-header.csv', text: '"id,note\n1,oops' };
+    const { job } = importCsv(cfg({ dedupKey: 'id' }), [src]);
+    expect(job.counts.created).toBe(0);
+    expect(job.counts.needsReview).toBe(1);
+    expect(job.failedRows[0].reason).toContain('unterminated quoted field');
+  });
+
+  test('a properly terminated multiline quoted cell still round-trips (no regression)', () => {
+    const { records } = importCsv(cfg({ dedupKey: 'id' }), [
+      { source: 'ok.csv', text: 'id,note\n1,"line one\nline two"\r\n2,"a,b"' },
+    ]);
+    expect(records.get('1')).toEqual({ id: '1', note: 'line one\nline two' });
+    expect(records.get('2')).toEqual({ id: '2', note: 'a,b' });
+  });
+});
+
 describe('person projection from the SAME contract', () => {
   test('toMyRecordsStatus narrows the job', () => {
     const { job } = importCsv(cfg(), [
