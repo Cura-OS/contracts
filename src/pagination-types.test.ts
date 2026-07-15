@@ -16,6 +16,12 @@ describe('clampLimit', () => {
   test('in range -> floored value', () => {
     expect(clampLimit(30.9, o)).toBe(30);
   });
+  test('NaN -> default', () => {
+    expect(clampLimit(NaN, o)).toBe(25);
+  });
+  test('Infinity -> max', () => {
+    expect(clampLimit(Infinity, o)).toBe(100);
+  });
 });
 
 describe('makePage', () => {

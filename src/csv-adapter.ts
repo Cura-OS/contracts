@@ -175,8 +175,12 @@ export function extractColumns(
   records: Map<string, ImportRecord>,
   columns: string[],
 ): string {
-  const esc = (v: string) =>
-    /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  const esc = (v: string) => {
+    // OWASP: neutralize formula injection - a leading =,+,-,@,tab,CR would make a
+    // spreadsheet evaluate the cell; prefix a single quote, then quote as normal.
+    const s = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
   const lines = [columns.map(esc).join(',')];
   for (const rec of records.values()) {
     lines.push(columns.map((c) => esc(rec[c] ?? '')).join(','));
