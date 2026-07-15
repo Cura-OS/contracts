@@ -46,6 +46,7 @@ export function clampLimit(
   opts: { def: number; max: number },
 ): number {
   const n = requested ?? opts.def;
+  if (Number.isNaN(n)) return opts.def;
   if (n < 1) return 1;
   if (n > opts.max) return opts.max;
   return Math.floor(n);

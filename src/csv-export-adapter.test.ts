@@ -27,6 +27,14 @@ describe('csvEscape', () => {
     expect(csvEscape('Doe, Jane')).toBe('"Doe, Jane"');
     expect(csvEscape('say "hi"')).toBe('"say ""hi"""');
   });
+  test('neutralizes formula-injection leading chars', () => {
+    expect(csvEscape('=1+2')).toBe("'=1+2");
+    expect(csvEscape('+1')).toBe("'+1");
+    expect(csvEscape('-1')).toBe("'-1");
+    expect(csvEscape('@cmd')).toBe("'@cmd");
+    // still quoted when a neutralized cell also carries a comma
+    expect(csvEscape('=a,b')).toBe('"\'=a,b"');
+  });
 });
 
 describe('exportCsv - record -> row mapping + counts', () => {

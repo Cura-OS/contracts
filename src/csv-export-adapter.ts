@@ -44,12 +44,15 @@ export interface CsvExportConfig {
 
 /**
  * Quote a CSV cell if it contains a comma, quote, or newline; double embedded
- * quotes. Mirrors the escaping in src/csv-adapter.ts extractColumns.
+ * quotes. A cell starting with = + - @ (or tab/CR) is neutralized with a leading
+ * single quote per OWASP guidance so spreadsheets do not evaluate it as a
+ * formula. Mirrors the escaping in src/csv-adapter.ts extractColumns.
  * ponytail: kept local to mirror the adapter shape; if a third adapter needs it,
  * hoist to a shared csv util then.
  */
 export function csvEscape(v: string): string {
-  return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  const s = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 /**
