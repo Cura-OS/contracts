@@ -8,6 +8,14 @@
 //
 // Tenant is NEVER a wire filter (the service scopes to the caller's tenant). The
 // from/to bounds are half-open: `from` inclusive, `to` exclusive.
+//
+// PHI boundary: `changes` carries changed field NAMES + non-PHI values only. The
+// redaction is enforced service-side BEFORE an entry becomes an AuditEntry, and
+// it MUST NOT be a single-format value scan (e.g. an SSN-shaped regex): a scan
+// that only recognizes one PHI format is dead under any payload that does not
+// match that format and leaks every other identifier (MRN, DOB, free-text). The
+// contract's guarantee is field-level allow-listing at the source, not a format
+// heuristic; this projection assumes that has already happened.
 
 import type { Page } from './pagination-types';
 
@@ -64,7 +72,23 @@ export function matchesQuery(entry: AuditEntry, q: AuditQueryParams): boolean {
     return false;
   }
   const at = Date.parse(entry.occurredAt);
-  if (q.from !== undefined && at < Date.parse(q.from)) return false;
-  if (q.to !== undefined && at >= Date.parse(q.to)) return false;
+  // Validate the caller-supplied bounds at the boundary. Date.parse returns NaN
+  // for an unparseable string, and every NaN comparison is false, so an invalid
+  // `from`/`to` would silently drop the window bound and leak records outside it.
+  // Fail loud instead of returning a wrong result.
+  if (q.from !== undefined) {
+    const from = Date.parse(q.from);
+    if (Number.isNaN(from)) {
+      throw new RangeError(`audit query 'from' is not a valid ISO-8601 timestamp: ${q.from}`);
+    }
+    if (at < from) return false;
+  }
+  if (q.to !== undefined) {
+    const to = Date.parse(q.to);
+    if (Number.isNaN(to)) {
+      throw new RangeError(`audit query 'to' is not a valid ISO-8601 timestamp: ${q.to}`);
+    }
+    if (at >= to) return false;
+  }
   return true;
 }

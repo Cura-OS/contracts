@@ -105,6 +105,25 @@ describe('extractColumns - backs export my data', () => {
   });
 });
 
+describe('quote-aware line splitting - export/import round-trip', () => {
+  test('a quoted field containing a newline round-trips (not torn across lines)', () => {
+    // extractColumns quotes a cell with an embedded newline; importing it back
+    // must treat the quoted newline as part of ONE field, not a row break.
+    const { records } = importCsv(cfg({ dedupKey: 'id' }), [
+      { source: 'in.csv', text: 'id,note\n1,seed' },
+    ]);
+    records.set('1', { id: '1', note: 'line one\nline two' });
+    const csv = extractColumns(records, ['id', 'note']);
+    expect(csv).toBe('id,note\n1,"line one\nline two"');
+
+    const round = importCsv(cfg({ dedupKey: 'id' }), [{ source: 'out.csv', text: csv }]);
+    // Without quote-aware splitting the newline tears the row: an EXTRA seen row
+    // + a column-count-mismatch needsReview + a truncated field.
+    expect(round.job.counts).toEqual({ seen: 1, created: 1, merged: 0, needsReview: 0 });
+    expect(round.records.get('1')).toEqual({ id: '1', note: 'line one\nline two' });
+  });
+});
+
 describe('person projection from the SAME contract', () => {
   test('toMyRecordsStatus narrows the job', () => {
     const { job } = importCsv(cfg(), [

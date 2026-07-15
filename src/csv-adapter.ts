@@ -69,9 +69,40 @@ export function splitCsvLine(line: string): string[] {
   return cells;
 }
 
-/** Split CSV text into non-empty lines (tolerates \r\n and a trailing newline). */
+/**
+ * Split CSV text into non-empty logical lines. QUOTE-AWARE: a newline inside an
+ * open quoted field does NOT end the line, so a quoted multiline cell (which
+ * extractColumns/exportCsv legitimately emit) round-trips instead of being torn
+ * across physical lines. Tolerates \r\n and a trailing newline. Mirrors
+ * splitCsvLine's quote handling (a "" pair inside quotes is a literal quote, not
+ * a field terminator) so the two stay consistent.
+ */
 function toLines(text: string): string[] {
-  return text.split(/\r?\n/).filter((l) => l.length > 0);
+  const lines: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        // escaped quote inside a quoted field: keep both, stay in-quotes
+        cur += '""';
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      cur += c;
+    } else if (c === '\n' && !inQuotes) {
+      lines.push(cur);
+      cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  lines.push(cur);
+  return lines
+    .map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l))
+    .filter((l) => l.length > 0);
 }
 
 /**
