@@ -102,7 +102,7 @@ export function assertDurableEnvelope(raw: unknown): asserts raw is DomainEventE
  */
 export function parsePartyLifecycleEvent(raw: unknown): PartyLifecycleEvent {
   assertDurableEnvelope(raw);
-  const party_id = (raw as Record<string, unknown>).party_id;
+  const party_id = (raw as DomainEventEnvelope & { party_id?: unknown }).party_id;
   if (typeof party_id !== 'string' || party_id.length === 0) {
     throw new TypeError("party lifecycle event missing 'party_id'");
   }
