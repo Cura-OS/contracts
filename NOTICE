@@ -1,0 +1,21 @@
+CuraOS contracts (@curaos/contracts)
+Copyright (c) 2026 CuraOS (Care Oriented Stack)
+
+This product includes model shapes port-adapted from a third-party work
+licensed under the Apache License, Version 2.0:
+
+  WorldVistA health-data-standards (HDS) - BulkRecordImporter
+  Copyright (c) The MITRE Corporation / WorldVistA
+  Licensed under the Apache License, Version 2.0
+  https://www.apache.org/licenses/LICENSE-2.0
+
+Ported facts (fresh TypeScript expressing the model; no source copied):
+  - the directory / archive / single-file ingest mode split
+  - the failed-unit quarantine-with-".error"-reason pattern
+  - the seen / merged / needs-review per-row counts
+  - the dedup-keyed-on-identifier (update_or_create) merge
+
+The CuraOS software in this repository is licensed under LicenseRef-CuraOS-BSL
+(see LICENSE); this NOTICE records the upstream Apache-2.0 attribution the
+above shapes derive from. Per-file attribution blocks live in
+specs/import-job.tsp and specs/export-job.tsp.

@@ -148,3 +148,5 @@ By contributing, you agree that your contributions will be licensed under the sa
 ## License
 
 LicenseRef-CuraOS-BSL - CuraOS (Care Oriented Stack). See [LICENSE](./LICENSE) for details.
+
+Third-party attribution for Apache-2.0-derived model shapes is recorded in [NOTICE](./NOTICE).
