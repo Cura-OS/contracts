@@ -243,7 +243,7 @@ export function assertManufacturingEnvelope(raw: unknown): asserts raw is Domain
  */
 export function parseMoEvent(raw: unknown): MoCreatedEvent | MoReleasedEvent | MoStartedEvent | MoDoneEvent {
   assertManufacturingEnvelope(raw);
-  const rec = raw as Record<string, unknown>;
+  const rec = raw as unknown as Record<string, unknown>;
   for (const key of ['manufacturing_order_id', 'order_number', 'item_id', 'quantity']) {
     requireString(rec, key);
   }
@@ -256,7 +256,7 @@ export function parseMoEvent(raw: unknown): MoCreatedEvent | MoReleasedEvent | M
  */
 export function parseWorkOrderEvent(raw: unknown): WorkOrderStartedEvent | WorkOrderCompletedEvent {
   assertManufacturingEnvelope(raw);
-  const rec = raw as Record<string, unknown>;
+  const rec = raw as unknown as Record<string, unknown>;
   for (const key of ['work_order_id', 'manufacturing_order_id', 'work_center_id']) {
     requireString(rec, key);
   }
@@ -272,7 +272,7 @@ export function parseMaterialEvent(
   raw: unknown,
 ): MaterialReservedEvent | MaterialConsumedEvent | MaterialBackflushedEvent {
   assertManufacturingEnvelope(raw);
-  const rec = raw as Record<string, unknown>;
+  const rec = raw as unknown as Record<string, unknown>;
   for (const key of ['manufacturing_order_id', 'item_id', 'warehouse_id', 'quantity']) {
     requireString(rec, key);
   }
@@ -290,7 +290,7 @@ export function parseMaterialEvent(
  */
 export function parsePlannedOrderEvent(raw: unknown): PlannedOrderCreatedEvent {
   assertManufacturingEnvelope(raw);
-  const rec = raw as Record<string, unknown>;
+  const rec = raw as unknown as Record<string, unknown>;
   for (const key of [
     'planned_order_id',
     'mrp_run_id',
