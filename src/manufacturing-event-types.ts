@@ -24,6 +24,7 @@
 // an opaque `party_id`, never a name or PHI.
 
 import { assertDurableEnvelope, type DomainEventEnvelope } from './party-event-types';
+import type { PlannedOrderType } from './manufacturing-types';
 import { createHash, randomUUID } from 'node:crypto';
 
 // ── Topics ────────────────────────────────────────────────────────────────────
@@ -43,6 +44,16 @@ export const MANUFACTURING_MATERIAL_BACKFLUSHED_TOPIC =
   'curaos.core.manufacturing.material.backflushed.v1';
 export const MANUFACTURING_PRODUCTION_COMPLETED_TOPIC =
   'curaos.core.manufacturing.production.completed.v1';
+/**
+ * The MRP-run explosion nets a demand shortfall into a PLANNED ORDER suggestion:
+ * `order_type=make` (produce, needs a BOM) or `order_type=buy` (purchase). This
+ * is the replenishment hand-off the neutral event plane publishes so a downstream
+ * PROCUREMENT consumer turns each planned BUY into a purchase requisition line /
+ * RFQ (MRP-14), and a MAKE folds into a manufacturing order. NEVER rename a `.v1`
+ * channel - add a `.v2` per [[curaos-rolling-update-rule]].
+ */
+export const MANUFACTURING_PLANNED_ORDER_CREATED_TOPIC =
+  'curaos.core.manufacturing.planned_order.created.v1';
 
 export type ManufacturingDomainEventType =
   | 'MoCreated'
@@ -54,7 +65,8 @@ export type ManufacturingDomainEventType =
   | 'MaterialReserved'
   | 'MaterialConsumed'
   | 'MaterialBackflushed'
-  | 'ProductionCompleted';
+  | 'ProductionCompleted'
+  | 'PlannedOrderCreated';
 
 export const MANUFACTURING_DOMAIN_EVENT_TOPIC: Record<ManufacturingDomainEventType, string> = {
   MoCreated: MANUFACTURING_MO_CREATED_TOPIC,
@@ -67,6 +79,7 @@ export const MANUFACTURING_DOMAIN_EVENT_TOPIC: Record<ManufacturingDomainEventTy
   MaterialConsumed: MANUFACTURING_MATERIAL_CONSUMED_TOPIC,
   MaterialBackflushed: MANUFACTURING_MATERIAL_BACKFLUSHED_TOPIC,
   ProductionCompleted: MANUFACTURING_PRODUCTION_COMPLETED_TOPIC,
+  PlannedOrderCreated: MANUFACTURING_PLANNED_ORDER_CREATED_TOPIC,
 };
 
 // ── Event shapes ────────────────────────────────────────────────────────────────
@@ -151,6 +164,34 @@ export type ProductionCompletedEvent = ManufacturingEvent<
   }
 >;
 
+/**
+ * Reference fields a planned-order event carries (the MRP-run explosion output).
+ * `order_type` splits make (production) vs buy (purchase); a PROCUREMENT consumer
+ * only acts on `buy`. `quantity` is a decimal string (fractional UoM stays exact);
+ * `lead_time_days` is the integer procurement lead time the run used, so
+ * `suggested_release_date == need_by_date - lead_time_days`. `planner_party_id` is
+ * the person who owns the demand (person-centric, opaque party ref).
+ */
+export interface PlannedOrderRef {
+  readonly planned_order_id: string;
+  readonly mrp_run_id: string;
+  readonly item_id: string;
+  readonly order_type: PlannedOrderType;
+  readonly quantity: string;
+  readonly uom: string;
+  /** When the demand needs the item (ISO-8601). */
+  readonly need_by_date: string;
+  /** need_by_date minus lead time - when a buy must be released (ISO-8601). */
+  readonly suggested_release_date: string;
+  /** Procurement lead time in days the run applied (integer >= 0). */
+  readonly lead_time_days: number;
+  readonly warehouse_id: string | null;
+  readonly source_demand_ref: string | null;
+  readonly planner_party_id: string | null;
+}
+
+export type PlannedOrderCreatedEvent = ManufacturingEvent<'PlannedOrderCreated', PlannedOrderRef>;
+
 export type ManufacturingDomainEvent =
   | MoCreatedEvent
   | MoReleasedEvent
@@ -161,7 +202,8 @@ export type ManufacturingDomainEvent =
   | MaterialReservedEvent
   | MaterialConsumedEvent
   | MaterialBackflushedEvent
-  | ProductionCompletedEvent;
+  | ProductionCompletedEvent
+  | PlannedOrderCreatedEvent;
 
 // ── Fail-closed validators ──────────────────────────────────────────────────────
 
@@ -235,6 +277,43 @@ export function parseMaterialEvent(
     requireString(rec, key);
   }
   return raw as MaterialReservedEvent | MaterialConsumedEvent | MaterialBackflushedEvent;
+}
+
+/**
+ * Parse a planned-order event fail-closed (MRP-14 replenishment hand-off): durable
+ * base + `planned_order_id`, `mrp_run_id`, `item_id`, `quantity`, `uom`,
+ * `need_by_date`, `suggested_release_date` MUST be present non-empty strings;
+ * `order_type` MUST be `make | buy`; `lead_time_days` MUST be a non-negative
+ * integer. This is the guard a PROCUREMENT consumer runs before it turns a planned
+ * BUY into a requisition line - a camelCase/typed drift fails here, never
+ * downstream. Returns the typed event or throws.
+ */
+export function parsePlannedOrderEvent(raw: unknown): PlannedOrderCreatedEvent {
+  assertManufacturingEnvelope(raw);
+  const rec = raw as Record<string, unknown>;
+  for (const key of [
+    'planned_order_id',
+    'mrp_run_id',
+    'item_id',
+    'quantity',
+    'uom',
+    'need_by_date',
+    'suggested_release_date',
+  ]) {
+    requireString(rec, key);
+  }
+  if (rec.order_type !== 'make' && rec.order_type !== 'buy') {
+    throw new TypeError(
+      `manufacturing planned-order event has invalid order_type '${String(rec.order_type)}' (expected 'make' | 'buy')`,
+    );
+  }
+  const lead = rec.lead_time_days;
+  if (typeof lead !== 'number' || !Number.isInteger(lead) || lead < 0) {
+    throw new RangeError(
+      `manufacturing planned-order event 'lead_time_days' must be a non-negative integer, got '${String(lead)}'`,
+    );
+  }
+  return raw as PlannedOrderCreatedEvent;
 }
 
 // ── Message build (mirror of inventory-core buildInventoryDomainMessage) ─────────

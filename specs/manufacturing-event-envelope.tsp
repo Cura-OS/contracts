@@ -93,6 +93,34 @@ model MaterialEvent is ManufacturingEvent<{
   lot_id: string | null;
 }>;
 
+@doc("The MRP-run explosion output: a planned make/buy order netted from a demand shortfall. A procurement consumer turns each buy into a purchase requisition line (MRP-14).")
+model PlannedOrderEvent is ManufacturingEvent<{
+  @doc("Opaque id of the planned order suggestion.")
+  planned_order_id: string;
+  @doc("The MRP run that produced this suggestion.")
+  mrp_run_id: string;
+  @doc("The item to make or buy.")
+  item_id: string;
+  @doc("make (produce, needs a BOM) or buy (purchase). A procurement consumer acts only on buy.")
+  order_type: string;
+  @doc("Net requirement quantity (decimal string; exact on the wire).")
+  quantity: string;
+  @doc("Unit of measure.")
+  uom: string;
+  @doc("When the demand needs the item.")
+  need_by_date: string;
+  @doc("need_by_date minus lead time - when a buy must be released.")
+  suggested_release_date: string;
+  @doc("Procurement lead time in days the run applied (integer >= 0).")
+  lead_time_days: int32;
+  @doc("Warehouse the requirement is netted for (null = tenant-wide).")
+  warehouse_id: string | null;
+  @doc("Upstream demand reference (e.g. the MO id) that drove the requirement.")
+  source_demand_ref: string | null;
+  @doc("Person-centric owner of the demand (opaque party ref; null = unassigned).")
+  planner_party_id: string | null;
+}>;
+
 @doc("Finished goods produced and received into stock (the goods-in leg of MO completion).")
 model ProductionCompletedEvent is ManufacturingEvent<{
   @doc("The completed manufacturing order.")
