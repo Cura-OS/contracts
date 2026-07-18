@@ -5,6 +5,8 @@ export * from './audit-query-types';
 export * from './party-event-types';
 export * from './conflict-types';
 export * from './conduct-standing-types';
+export * from './manufacturing-types';
+export * from './manufacturing-event-types';
 export {
   importCsv,
   extractColumns,
