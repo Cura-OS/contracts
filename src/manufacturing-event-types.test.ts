@@ -1,12 +1,14 @@
 import { describe, expect, test } from 'bun:test';
 import {
   MANUFACTURING_DOMAIN_EVENT_TOPIC,
+  MANUFACTURING_PLANNED_ORDER_CREATED_TOPIC,
   assertManufacturingEnvelope,
   buildManufacturingMessage,
   manufacturingBaseFields,
   manufacturingPartitionKey,
   parseMaterialEvent,
   parseMoEvent,
+  parsePlannedOrderEvent,
   parseWorkOrderEvent,
   type ManufacturingDomainEvent,
   type ManufacturingDomainEventType,
@@ -34,7 +36,7 @@ const moEvent = (over: Record<string, unknown> = {}): Record<string, unknown> =>
 describe('MANUFACTURING_DOMAIN_EVENT_TOPIC', () => {
   test('every event type maps to a distinct versioned topic', () => {
     const topics = Object.values(MANUFACTURING_DOMAIN_EVENT_TOPIC);
-    expect(topics.length).toBe(10);
+    expect(topics.length).toBe(11);
     expect(new Set(topics).size).toBe(topics.length);
     for (const topic of topics) {
       expect(topic).toMatch(/^curaos\.core\.manufacturing\.[a-z_]+\.[a-z_]+\.v1$/);
@@ -126,6 +128,67 @@ describe('parseMaterialEvent', () => {
     const bad = mat();
     delete bad.warehouse_id;
     expect(() => parseMaterialEvent(bad)).toThrow(/warehouse_id/);
+  });
+});
+
+describe('parsePlannedOrderEvent', () => {
+  const planned = (over: Record<string, unknown> = {}) =>
+    base({
+      type: 'PlannedOrderCreated',
+      planned_order_id: 'po-1',
+      mrp_run_id: 'run-1',
+      item_id: 'item-comp-leg',
+      order_type: 'buy',
+      quantity: '40',
+      uom: 'ea',
+      need_by_date: '2026-08-01',
+      suggested_release_date: '2026-07-25',
+      lead_time_days: 7,
+      warehouse_id: 'wh-1',
+      source_demand_ref: 'mo-1',
+      planner_party_id: 'party-planner',
+      ...over,
+    });
+
+  test('maps to a distinct versioned topic', () => {
+    expect(MANUFACTURING_DOMAIN_EVENT_TOPIC.PlannedOrderCreated).toBe(
+      MANUFACTURING_PLANNED_ORDER_CREATED_TOPIC,
+    );
+  });
+
+  test('parses a complete buy planned-order event', () => {
+    const ev = parsePlannedOrderEvent(planned());
+    expect(ev.order_type).toBe('buy');
+    expect(ev.quantity).toBe('40');
+    expect(ev.lead_time_days).toBe(7);
+  });
+
+  test('parses a make planned-order event', () => {
+    expect(parsePlannedOrderEvent(planned({ order_type: 'make' })).order_type).toBe('make');
+  });
+
+  test.each([
+    'planned_order_id',
+    'mrp_run_id',
+    'item_id',
+    'quantity',
+    'uom',
+    'need_by_date',
+    'suggested_release_date',
+  ])('rejects a missing %s', (key) => {
+    const bad = planned();
+    delete bad[key];
+    expect(() => parsePlannedOrderEvent(bad)).toThrow(new RegExp(key));
+  });
+
+  test('rejects an invalid order_type', () => {
+    expect(() => parsePlannedOrderEvent(planned({ order_type: 'lease' }))).toThrow(/order_type/);
+  });
+
+  test.each([-1, 1.5, '7', Number.NaN])('rejects a non-integer lead_time_days: %p', (lead) => {
+    expect(() => parsePlannedOrderEvent(planned({ lead_time_days: lead }))).toThrow(
+      /lead_time_days/,
+    );
   });
 });
 

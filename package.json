@@ -1,7 +1,7 @@
 {
   "name": "@curaos/contracts",
   "description": "CuraOS shared wire contracts. The import-job mold (directory/archive/file modes, failed-row quarantine with reason, seen/merged/needs-review counts, person-facing status projection) plus a CSV adapter; the party.* durable domain-event envelope; and the neutral manufacturing (MRP) entity + versioned domain-event contracts (work-center, routing/operation, multi-level bill-of-materials, manufacturing-order, per-operation work-order, item-planning-master, MRP-run/planned-order). Fresh TypeScript, no source copied.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "devDependencies": {
     "oxlint": "1.68.0",
     "@curaos/tsconfig": "workspace:*",
