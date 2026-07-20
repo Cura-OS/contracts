@@ -3,6 +3,7 @@ export * from './export-types';
 export * from './pagination-types';
 export * from './audit-query-types';
 export * from './party-event-types';
+export * from './identity-provisioning-event-types';
 export * from './conflict-types';
 export * from './conduct-standing-types';
 export * from './manufacturing-types';
