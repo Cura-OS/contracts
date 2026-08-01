@@ -212,8 +212,12 @@ const MANUFACTURING_EVENT_TYPES = new Set<string>(
   Object.keys(MANUFACTURING_DOMAIN_EVENT_TOPIC),
 );
 
-function requireString(rec: Record<string, unknown>, key: string): void {
-  const v = rec[key];
+function eventField(raw: object, key: string): unknown {
+  return Reflect.get(raw, key);
+}
+
+function requireString(raw: object, key: string): void {
+  const v = eventField(raw, key);
   if (typeof v !== 'string' || v.length === 0) {
     throw new TypeError(`manufacturing event missing reference field '${key}'`);
   }
@@ -228,7 +232,7 @@ function requireString(rec: Record<string, unknown>, key: string): void {
  */
 export function assertManufacturingEnvelope(raw: unknown): asserts raw is DomainEventEnvelope {
   assertDurableEnvelope(raw);
-  const type = (raw as DomainEventEnvelope).type;
+  const type = raw.type;
   if (!MANUFACTURING_EVENT_TYPES.has(type)) {
     throw new TypeError(
       `manufacturing event has unknown type '${type}' (not a v1 manufacturing topic)`,
@@ -243,9 +247,8 @@ export function assertManufacturingEnvelope(raw: unknown): asserts raw is Domain
  */
 export function parseMoEvent(raw: unknown): MoCreatedEvent | MoReleasedEvent | MoStartedEvent | MoDoneEvent {
   assertManufacturingEnvelope(raw);
-  const rec = raw as Record<string, unknown>;
   for (const key of ['manufacturing_order_id', 'order_number', 'item_id', 'quantity']) {
-    requireString(rec, key);
+    requireString(raw, key);
   }
   return raw as MoCreatedEvent | MoReleasedEvent | MoStartedEvent | MoDoneEvent;
 }
@@ -256,9 +259,8 @@ export function parseMoEvent(raw: unknown): MoCreatedEvent | MoReleasedEvent | M
  */
 export function parseWorkOrderEvent(raw: unknown): WorkOrderStartedEvent | WorkOrderCompletedEvent {
   assertManufacturingEnvelope(raw);
-  const rec = raw as Record<string, unknown>;
   for (const key of ['work_order_id', 'manufacturing_order_id', 'work_center_id']) {
-    requireString(rec, key);
+    requireString(raw, key);
   }
   return raw as WorkOrderStartedEvent | WorkOrderCompletedEvent;
 }
@@ -272,9 +274,8 @@ export function parseMaterialEvent(
   raw: unknown,
 ): MaterialReservedEvent | MaterialConsumedEvent | MaterialBackflushedEvent {
   assertManufacturingEnvelope(raw);
-  const rec = raw as Record<string, unknown>;
   for (const key of ['manufacturing_order_id', 'item_id', 'warehouse_id', 'quantity']) {
-    requireString(rec, key);
+    requireString(raw, key);
   }
   return raw as MaterialReservedEvent | MaterialConsumedEvent | MaterialBackflushedEvent;
 }
@@ -290,7 +291,6 @@ export function parseMaterialEvent(
  */
 export function parsePlannedOrderEvent(raw: unknown): PlannedOrderCreatedEvent {
   assertManufacturingEnvelope(raw);
-  const rec = raw as Record<string, unknown>;
   for (const key of [
     'planned_order_id',
     'mrp_run_id',
@@ -300,14 +300,15 @@ export function parsePlannedOrderEvent(raw: unknown): PlannedOrderCreatedEvent {
     'need_by_date',
     'suggested_release_date',
   ]) {
-    requireString(rec, key);
+    requireString(raw, key);
   }
-  if (rec.order_type !== 'make' && rec.order_type !== 'buy') {
+  const orderType = eventField(raw, 'order_type');
+  if (orderType !== 'make' && orderType !== 'buy') {
     throw new TypeError(
-      `manufacturing planned-order event has invalid order_type '${String(rec.order_type)}' (expected 'make' | 'buy')`,
+      `manufacturing planned-order event has invalid order_type '${String(orderType)}' (expected 'make' | 'buy')`,
     );
   }
-  const lead = rec.lead_time_days;
+  const lead = eventField(raw, 'lead_time_days');
   if (typeof lead !== 'number' || !Number.isInteger(lead) || lead < 0) {
     throw new RangeError(
       `manufacturing planned-order event 'lead_time_days' must be a non-negative integer, got '${String(lead)}'`,
