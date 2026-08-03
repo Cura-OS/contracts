@@ -92,5 +92,3 @@ export function matchesQuery(entry: AuditEntry, q: AuditQueryParams): boolean {
   }
   return true;
 }
-
-export const gateProbe: number = 'not a number';
